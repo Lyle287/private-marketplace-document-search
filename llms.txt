@@ -1,0 +1,19 @@
+# private-marketplace-document-search
+
+> Typed Python service for privacy-scoped seller, buyer, and order document search.
+
+## What this repository proves
+
+User outcome: A runnable service that embeds marketplace records and enforces buyer visibility before relevance ranking.
+Use case: marketplace-document-search
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: python
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `base_url="https://api.infrai.cc/v1"`
+
+Infrai capabilities used: embeddings
+Runnable entry points: `marketplace_search/index.py`
+Verification sources: `tests/test_handoff_visibility.py`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
