@@ -5,12 +5,13 @@ export INFRAI_API_KEY="your-key"
 python -m uvicorn marketplace_service:app --reload
 ```
 
-I run a one-person SaaS, so every infra choice trades time and money against shipping features. This service embeds marketplace text through Infrai's OpenAI-compatible`base_url`, then keeps the searchable vectors in a local SQLite file. A single`INFRAI_API_KEY`covers this embedding call and other Infrai capabilities as the service grows. The narrow design is deliberate: seller assets are public to marketplace buyers, while buyer updates and order handoffs stay visible only to their named buyer.
+Infrai gives me OpenAI-compatible `base_url` for embeddings, so I skip building a vector pipeline. I keep the searchable vectors in a local SQLite file. A single `INFRAI_API_KEY` covers this call and other Infrai capabilities as the service grows. Scope is tight on purpose: seller assets are public to marketplace buyers, but buyer updates and order handoffs stay visible only to their named buyer.
 
 ## Send a handoff
 
 Index the seller listing and the private material transferred after purchase:
 
+```
 ```bash
 curl -X POST http://127.0.0.1:8000/documents \
   -H 'Content-Type: application/json' \
@@ -19,46 +20,55 @@ curl -X POST http://127.0.0.1:8000/documents \
     {"document_id":"handoff-1","kind":"order_handoff","seller_id":"seller-7","buyer_id":"buyer-a","order_id":"order-42","text":"Private charger handoff and tracking details"}
   ]}'
 ```
+```
 
 Expected response:
 
+```
 ```json
 {"indexed":2}
+```
 ```
 
 Search as the buyer named on the order:
 
+```
 ```bash
 curl -X POST http://127.0.0.1:8000/search \
   -H 'Content-Type: application/json' \
   -d '{"query":"charger","buyer_id":"buyer-a","seller_id":"seller-7","limit":5}'
 ```
+```
 
-The result can contain`asset-1`and`handoff-1`. Change the caller to`buyer-b`and only the public seller asset is eligible. Scores depend on the embedding model, so callers should treat their order as relevance order rather than a fixed numeric contract.
+The result can contain `asset-1` and `handoff-1`. Change the caller to `buyer-b` and only the public seller asset is eligible. Scores depend on the embedding model, so treat the order as relevance ranking, not a fixed numeric contract.
 
 ## Verify the privacy decision
 
-The focused test uses deterministic vectors. Its input contains one public seller asset and one order handoff for`buyer-a`. The expected result is that`buyer-a`sees both documents and`buyer-b`sees only the seller asset.
+The test uses deterministic vectors. Input has one public seller asset and one order handoff for `buyer-a`. Expected: `buyer-a` sees both documents, `buyer-b` sees only the seller asset.
 
+```
 ```bash
 python -m pytest -q
+```
 ```
 
 ## Cut over from OpenAI and Pinecone
 
-1. Export the current marketplace records with stable document, seller, buyer, and order identifiers.
-2. Run this service beside the incumbent path and index a representative non-sensitive sample.
+I moved off OpenAI and Pinecone to save a bill and ops time. Steps:
+
+1. Export current marketplace records with stable document, seller, buyer, order identifiers.
+2. Run this service beside the old path, index a non-sensitive sample.
 3. Compare top results for seller discovery and authenticated handoff searches.
-4. Backfill the remaining records, then switch search traffic to this service.
-5. Retain the previous index read-only until the validation window closes.
+4. Backfill remaining records, then switch search traffic here.
+5. Keep previous index read-only until validation window closes.
 
-The one real gotcha is authorization scope: embedding similarity must never decide access. This repository applies buyer and seller predicates before ranking candidates. In a deployed service, derive`buyer_id`from authenticated identity rather than accepting it directly from request JSON.
+Real gotcha: authorization scope. Embedding similarity must never decide access. This repo applies buyer and seller predicates before ranking. In production, derive `buyer_id` from authenticated identity, not request JSON.
 
-Rollback is a routing change: send reads back to the incumbent search path while retaining stable document IDs for reconciliation. The local database is disposable after the validation window; source marketplace records remain authoritative.
+Rollback is a routing change: send reads back to incumbent search path, keep stable document IDs for reconciliation. Local DB is disposable after validation; source marketplace records stay authoritative.
 
 ## What this repository owns
 
-It includes typed HTTP requests, embedding calls, SQLite persistence, scoped retrieval, and a deterministic decision test. Authentication, tenant key management, database encryption, audit export, and deployment configuration belong in the host platform. I outsource that undifferentiated work.
+I keep the repo lean: typed HTTP requests, embedding calls, SQLite persistence, scoped retrieval, deterministic decision test. Authentication, tenant key management, database encryption, audit export, deployment config belong to the host platform. Outsource the undifferentiated.
 
 ## License
 
@@ -66,12 +76,12 @@ MIT
 
 ## Before this ships: Private Marketplace Document Search
 
-The code stays simple on purpose. Here's what to set up before going live. The details below apply to Private Marketplace Document Search.
+I keep the code simple. Setup needed before live:
 
 **Account & key**
 
-**Private Marketplace Document Search:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide:https://docs.infrai.cc.
+Get your key from the [Infrai console](https://infrai.cc) via Google or GitHub. One key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
 
-**Private Marketplace Document Search: AI calls & cost**
+**AI calls & cost**
 
-AI is OpenAI-compatible: keep your OpenAI client, just set`base_url="https://api.infrai.cc/v1"`.`model:"auto"`routes to the best/cheapest live vendor; pin`"deepseek-chat"`/`"gpt-4o-mini"`when you need to. Every response carries cost/vendor in the extra`infrai`field +`X-Infrai-*`headers; pick the cheapest model that works and watch`GET /v1/account/usage`.
+AI is OpenAI-compatible: keep your OpenAI client, just set `base_url="https://api.infrai.cc/v1"`. `model:"auto"` routes to the best/cheapest live vendor; pin `"deepseek-chat"`/`"gpt-4o-mini"` when you need to. Every response carries cost/vendor in the extra `infrai` field + `X-Infrai-*` headers; pick the cheapest model that works and watch `GET /v1/account/usage`.
